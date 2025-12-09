@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { SessionMetrics, TimelineMessage } from "../components/context-banner/types";
+import { SessionMetrics, TimelineMessage, LogMessage } from "../types";
 
 /**
  * Hook to derive session metrics and timeline from existing logs
@@ -144,10 +144,3 @@ const calculateContentLength = (obj: any): number => {
 
 	return 0;
 };
-
-// Interface matching the existing LogMessage in ConsoleApp.tsx
-interface LogMessage {
-	id: string;
-	request?: any;
-	response?: any;
-}

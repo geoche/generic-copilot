@@ -1,13 +1,7 @@
 import React, { useMemo } from "react";
 import { calculateTimelineSizes } from "../../utils/timelineCalculations";
 import { formatRelativeTime } from "../../utils/formatters";
-import { TimelineMessage } from "./types";
-
-interface SessionTimelineProps {
-	messages: TimelineMessage[];
-	isActive?: boolean;
-	onMessageClick?: (id: string) => void;
-}
+import { SessionTimelineProps } from "./../../types";
 
 export const SessionTimeline: React.FC<SessionTimelineProps> = ({ messages, isActive, onMessageClick }) => {
 	const barSizes = useMemo(() => calculateTimelineSizes(messages), [messages]);

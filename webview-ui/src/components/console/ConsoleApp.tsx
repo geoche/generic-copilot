@@ -4,18 +4,13 @@ import InteractionListItem from './InteractionListItem';
 import InteractionList from './InteractionList';
 import { ContextBanner } from '../context-banner/ContextBanner';
 import { useSessionMetrics } from '../../hooks/useSessionMetrics';
+import { LogMessage } from '../../types';
 
 declare function acquireVsCodeApi(): {
     postMessage: (message: any) => void;
     setState: (state: any) => void;
     getState: () => any;
 };
-
-interface LogMessage {
-    id: string;
-    request?: any;
-    response?: any;
-}
 
 export const ConsoleApp: React.FC = () => {
     const [logs, setLogs] = useState<LogMessage[]>([]);
