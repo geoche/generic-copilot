@@ -13,6 +13,8 @@ import { ModelItem, ProviderConfig, VercelType } from "../types";
 import { LM2VercelMessage, LM2VercelTool, normalizeToolInputs } from "./utils/conversion";
 import { ModelMessage, LanguageModel, Provider } from "ai";
 import { MessageLogger, LoggedRequest, LoggedResponse, LoggedInteraction } from "./utils/messageLogger";
+import { ApiUsageData } from "./utils/messageLogger";
+import { estimateMessagesTokens } from "../provideToken";
 
 /**
  * Abstract base class for provider clients that interact with language model providers.
@@ -59,15 +61,25 @@ export abstract class ProviderClient {
 		const tools = this.convertTools(options);
 		const messageLogger = MessageLogger.getInstance();
 
-		//Log the incoming request as soon as possible.
+		// Estimate input tokens as fallback (will be updated with real usage data if available)
+		const estimatedInputTokens = estimateMessagesTokens(request);
+
+		// Log the request
 		const interactionId = messageLogger.addRequestResponse({
 			type: "request",
 			vscodeMessages: request,
 			vscodeOptions: options,
 			vercelMessages: messages,
 			vercelTools: tools,
-			modelConfig: config
+			modelConfig: config,
+			// Fallback estimation - will be updated with real usage if available
+			usage: {
+				prompt_tokens: estimatedInputTokens,
+				completion_tokens: 0,
+				total_tokens: estimatedInputTokens,
+			},
 		} as LoggedRequest);
+
 		try {
 			const result = await streamText({
 				model: languageModel,
@@ -80,24 +92,77 @@ export abstract class ProviderClient {
 				textParts: [],
 				thinkingParts: [],
 				toolCallParts: [],
+				textContentLength: 0,
 			};
 
-			// We need to handle fullStream to get tool calls
+			let totalContentLength = 0;
+
+			// Process streaming response
 			for await (const part of result.fullStream) {
 				if (part.type === "reasoning-delta") {
 					const thinkingPart = new LanguageModelThinkingPart(part.text);
 					responseLog.thinkingParts?.push(thinkingPart);
+					totalContentLength += part.text.length;
 					progress.report(thinkingPart);
 				} else if (part.type === "text-delta") {
 					const textPart = new LanguageModelTextPart(part.text);
 					responseLog.textParts?.push(textPart);
+					totalContentLength += part.text.length;
 					progress.report(new LanguageModelTextPart(part.text));
 				} else if (part.type === "tool-call") {
 					const normalizedInput = normalizeToolInputs(part.toolName, part.input);
 					const toolCall = new LanguageModelToolCallPart(part.toolCallId, part.toolName, normalizedInput as object);
 					responseLog.toolCallParts?.push(toolCall);
+					totalContentLength += part.toolName.length + JSON.stringify(part.input).length;
 					progress.report(toolCall);
 				}
+			}
+
+			// Extract actual usage data from result
+			let finalUsage: ApiUsageData = {
+				prompt_tokens: estimatedInputTokens,
+				completion_tokens: Math.ceil(totalContentLength / 4), // Fallback estimation
+				total_tokens: estimatedInputTokens + Math.ceil(totalContentLength / 4),
+			};
+
+			// Try to get real usage data from AI SDK
+			if (result.usage) {
+				finalUsage = {
+					prompt_tokens:
+						(result.usage as any).promptTokens || (result.usage as any).prompt_tokens || estimatedInputTokens,
+					completion_tokens:
+						(result.usage as any).completionTokens ||
+						(result.usage as any).completion_tokens ||
+						Math.ceil(totalContentLength / 4),
+					total_tokens:
+						(result.usage as any).totalTokens || (result.usage as any).total_tokens || finalUsage.total_tokens,
+				};
+			}
+
+			// Try to get usage from additional API calls if available
+			// This is a placeholder for potential additional usage data sources
+			if ((result as any).response) {
+				const response = (result as any).response;
+				if (response.usage) {
+					finalUsage = {
+						prompt_tokens: response.usage.prompt_tokens || finalUsage.prompt_tokens,
+						completion_tokens: response.usage.completion_tokens || finalUsage.completion_tokens,
+						total_tokens: response.usage.total_tokens || finalUsage.total_tokens,
+					};
+				}
+			}
+
+			responseLog.usage = finalUsage;
+			responseLog.textContentLength = totalContentLength; // For display only
+
+			// Update the request log with final usage data
+			const requestLog = messageLogger.getById(interactionId)?.request;
+			if (requestLog) {
+				requestLog.usage = {
+					prompt_tokens: finalUsage.prompt_tokens,
+					completion_tokens: 0, // Request doesn't have completion tokens
+					total_tokens: finalUsage.prompt_tokens,
+				};
 			}
 			messageLogger.addRequestResponse(responseLog, interactionId);
 		} catch (error) {

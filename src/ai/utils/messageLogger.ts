@@ -16,6 +16,15 @@ import { ModelItem } from "../../types";
  */
 
 /**
+ * API usage data from actual API responses
+ */
+export interface ApiUsageData {
+	prompt_tokens: number;
+	completion_tokens: number;
+	total_tokens: number;
+}
+
+/**
  * Represents a request sent to the language model
  */
 export interface LoggedRequest {
@@ -37,6 +46,9 @@ export interface LoggedRequest {
 
 	/** Timestamp of the request */
 	timestamp?: Date;
+
+	/** Actual API usage data from response */
+	usage?: ApiUsageData;
 }
 
 /**
@@ -53,6 +65,12 @@ export interface LoggedResponse {
 
 	// /** Timestamp when response started */
 	timestamp?: Date;
+
+	/** Actual API usage data from response */
+	usage?: ApiUsageData;
+
+	/** Total text content length for display purposes only */
+	textContentLength?: number;
 }
 
 /**

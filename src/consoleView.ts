@@ -63,81 +63,106 @@ export class ConsoleViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	private _serializeLogs(logs: LoggedInteraction[]): any[] {
-		return logs.map((log) => ({
-			id: log.id,
-			request: log.request
-				? {
-						timestamp: log.request.timestamp?.toISOString(),
-						modelId: log.request.modelConfig.id,
-						modelSlug: log.request.modelConfig.slug,
-						messageCount: log.request.vscodeMessages.length,
-						toolsCount: log.request.vercelTools ? Object.keys(log.request.vercelTools).length : 0,
-						messages: log.request.vscodeMessages.map((msg: any) => ({
-							role: msg.role,
-							// If content is already a raw string, just use it
-							content: typeof msg.content === 'string'
-								? msg.content
-								: // Otherwise it's an array of parts (text parts, tool results, etc.) — preserve structured parts when possible
-								  msg.content.map((part: any) => {
-									  if (typeof part === 'string') return part;
+		const serialized = logs.map((log) => {
+			const result = {
+				id: log.id,
+				request: log.request
+					? {
+							timestamp: log.request.timestamp?.toISOString(),
+							modelId: log.request.modelConfig.id,
+							modelSlug: log.request.modelConfig.slug,
+							modelContextLength: log.request.modelConfig.model_properties?.context_length,
+							messageCount: log.request.vscodeMessages.length,
+							toolsCount: log.request.vercelTools ? Object.keys(log.request.vercelTools).length : 0,
+							// Only actual usage data
+							usage: log.request.usage
+								? {
+										prompt_tokens: log.request.usage.prompt_tokens,
+										completion_tokens: log.request.usage.completion_tokens,
+										total_tokens: log.request.usage.total_tokens,
+									}
+								: undefined,
+							vscodeMessages: log.request.vscodeMessages, // Include for context token calculation
+							messages: log.request.vscodeMessages.map((msg: any) => ({
+								role: msg.role,
+								// If content is already a raw string, just use it
+								content:
+									typeof msg.content === "string"
+										? msg.content
+										: // Otherwise it's an array of parts (text parts, tool results, etc.) — preserve structured parts when possible
+											msg.content.map((part: any) => {
+												if (typeof part === "string") return part;
 
-									  // Standard text parts used by many language model APIs — return raw text
-									  if (part.value) return part.value;
-									  if (part.text) return part.text;
+												// Standard text parts used by many language model APIs — return raw text
+												if (part.value) return part.value;
+												if (part.text) return part.text;
 
-									  // Tool result parts often expose a `content` property (which may be an array)
-									  if (part.content) {
-										  // If the tool returned multiple content items filter out cache-control metadata
-										  let content = part.content;
-										  if (Array.isArray(content)) {
-											  content = content.filter((c: any) => !(c && c.mimeType === 'cache_control'));
-										  }
+												// Tool result parts often expose a `content` property (which may be an array)
+												if (part.content) {
+													// If the tool returned multiple content items filter out cache-control metadata
+													let content = part.content;
+													if (Array.isArray(content)) {
+														content = content.filter((c: any) => !(c && c.mimeType === "cache_control"));
+													}
 
-										  // Return a structured tool-result object instead of a string so the front-end can render it specially
-										  return {
-											  type: 'tool-result',
-											  toolCallId: part.callId ?? part.toolCallId ?? undefined,
-											  output: content,
-										  };
-									  }
+													// Return a structured tool-result object instead of a string so the front-end can render it specially
+													return {
+														type: "tool-result",
+														toolCallId: part.callId ?? part.toolCallId ?? undefined,
+														output: content,
+													};
+												}
 
-									  // Tool call parts (calls _to_ tools, not results) -- include name and input if present
-									  if (part.name || part.input || part.callId || part.toolCallId) {
-										  const name = part.name ?? part.toolName ?? '(tool)';
-										  const id = part.callId ?? part.toolCallId ?? part.callId ?? '';
-										  const input = part.input ?? part.args ?? part.input ?? undefined;
-										  const inputStr = input ? JSON.stringify(input, null, 2) : '';
-										  // Keep previous string format for tool-calls in requests for now
-										  return `[tool-call] ${name}${id ? ` (${id})` : ''}${inputStr ? ` -> ${inputStr}` : ''}`;
-									  }
+												// Tool call parts (calls _to_ tools, not results) -- include name and input if present
+												if (part.name || part.input || part.callId || part.toolCallId) {
+													const name = part.name ?? part.toolName ?? "(tool)";
+													const id = part.callId ?? part.toolCallId ?? part.callId ?? "";
+													const input = part.input ?? part.args ?? part.input ?? undefined;
+													const inputStr = input ? JSON.stringify(input, null, 2) : "";
+													// Keep previous string format for tool-calls in requests for now
+													return `[tool-call] ${name}${id ? ` (${id})` : ""}${inputStr ? ` -> ${inputStr}` : ""}`;
+												}
 
-									  // Unknown non-text content — preserve if serializable
-									  try {
-										  return JSON.parse(JSON.stringify(part));
-									  } catch (err) {
-										  return '[non-text content]';
-									  }
-								  }),
-						})),
-				  }
-				: undefined,
-			response: log.response
-				? {
-						timestamp: log.response.timestamp?.toISOString(),
-						textPartsCount: log.response.textParts?.length ?? 0,
-						thinkingPartsCount: log.response.thinkingParts?.length ?? 0,
-						toolCallsCount: log.response.toolCallParts?.length ?? 0,
-						textContent: log.response.textParts?.map((p) => p.value).join("") ?? "",
-						thinkingContent: log.response.thinkingParts?.map((p) => p.value).join("") ?? "",
-						toolCalls:
-							log.response.toolCallParts?.map((tc) => ({
-								id: tc.callId,
-								name: tc.name,
-								input: tc.input,
-							})) ?? [],
-				  }
-				: undefined,
-		}));
+												// Unknown non-text content — preserve if serializable
+												try {
+													return JSON.parse(JSON.stringify(part));
+												} catch (err) {
+													return "[non-text content]";
+												}
+											}),
+							})),
+						}
+					: undefined,
+				response: log.response
+					? {
+							timestamp: log.response.timestamp?.toISOString(),
+							textPartsCount: log.response.textParts?.length ?? 0,
+							thinkingPartsCount: log.response.thinkingParts?.length ?? 0,
+							toolCallsCount: log.response.toolCallParts?.length ?? 0,
+							// Only actual usage data
+							usage: log.response.usage
+								? {
+										prompt_tokens: log.response.usage.prompt_tokens,
+										completion_tokens: log.response.usage.completion_tokens,
+										total_tokens: log.response.usage.total_tokens,
+									}
+								: undefined,
+							textContent: log.response.textParts?.map((p) => p.value).join("") ?? "",
+							thinkingContent: log.response.thinkingParts?.map((p) => p.value).join("") ?? "",
+							toolCalls:
+								log.response.toolCallParts?.map((tc) => ({
+									id: tc.callId,
+									name: tc.name,
+									input: tc.input,
+								})) ?? [],
+						}
+					: undefined,
+			};
+
+			return result;
+		});
+
+		return serialized;
 	}
 
 	private async _getHtmlForWebview(webview: vscode.Webview) {
@@ -153,7 +178,7 @@ export class ConsoleViewProvider implements vscode.WebviewViewProvider {
 			.replaceAll("%CSP_SOURCE%", webview.cspSource)
 			.replaceAll("%NONCE%", nonce)
 			.replace("%CSS_URI%", cssUri.toString())
-			.replace("%SCRIPT_URI%", bundleUri.toString())
+			.replace("%SCRIPT_URI%", bundleUri.toString());
 	}
 }
 
