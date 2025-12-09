@@ -13,6 +13,7 @@ import { ModelItem, ProviderConfig, VercelType } from "../types";
 import { LM2VercelMessage, LM2VercelTool, normalizeToolInputs } from "./utils/conversion";
 import { ModelMessage, LanguageModel, Provider } from "ai";
 import { MessageLogger, LoggedRequest, LoggedResponse, LoggedInteraction } from "./utils/messageLogger";
+import { logger } from "../outputLogger";
 import { ApiUsageData } from "./utils/messageLogger";
 import { estimateMessagesTokens } from "../provideToken";
 
@@ -41,6 +42,7 @@ export abstract class ProviderClient {
 		this.type = type;
 		this.config = config;
 		this.providerInstance = providerInstance;
+		logger.debug(`ProviderClient created for type "${type}" with config ID "${config.id}"`);
 	}
 
 	/**
@@ -60,11 +62,11 @@ export abstract class ProviderClient {
 		const messages = this.convertMessages(request);
 		const tools = this.convertTools(options);
 		const messageLogger = MessageLogger.getInstance();
-
 		// Estimate input tokens as fallback (will be updated with real usage data if available)
 		const estimatedInputTokens = estimateMessagesTokens(request);
 
-		// Log the request
+		logger.debug(`Generating streaming response for model "${config.id}" with provider "${this.config.id}"`);
+		//Log the incoming request as soon as possible.
 		const interactionId = messageLogger.addRequestResponse({
 			type: "request",
 			vscodeMessages: request,
@@ -81,6 +83,7 @@ export abstract class ProviderClient {
 		} as LoggedRequest);
 
 		try {
+			logger.debug(`Streaming response started for model "${config.id}" with provider "${this.config.id}"`);
 			const result = await streamText({
 				model: languageModel,
 				messages: messages,
@@ -95,6 +98,8 @@ export abstract class ProviderClient {
 				textContentLength: 0,
 			};
 
+			logger.debug(`Processing streaming response parts for model "${config.id}" with provider "${this.config.id}"`);
+			// We need to handle fullStream to get tool calls
 			let totalContentLength = 0;
 
 			// Process streaming response
@@ -166,7 +171,7 @@ export abstract class ProviderClient {
 			}
 			messageLogger.addRequestResponse(responseLog, interactionId);
 		} catch (error) {
-			console.error("Chat request failed:", error);
+			logger.error("Chat request failed:", error);
 			throw error;
 		}
 	}
