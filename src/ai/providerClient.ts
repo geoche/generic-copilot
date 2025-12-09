@@ -2,10 +2,10 @@ import {
 	Progress,
 	LanguageModelChatRequestMessage,
 	LanguageModelTextPart,
-	LanguageModelThinkingPart, //part of proposed api
+	LanguageModelThinkingPart,
 	LanguageModelToolCallPart,
 	ProvideLanguageModelChatResponseOptions,
-	LanguageModelResponsePart2 as LanguageModelResponsePart, //part of proposed api
+	LanguageModelResponsePart2 as LanguageModelResponsePart,
 } from "vscode";
 
 import { streamText } from "ai";
