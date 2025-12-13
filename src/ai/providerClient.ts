@@ -155,42 +155,33 @@ export abstract class ProviderClient {
 				logger.debug(`[API Usage] Model: ${config.id}, Request ID: ${interactionId}`);
 				logger.debug(`[API Response] Full result object keys: ${JSON.stringify(Object.keys(result))}`);
 				
-				// Try to access rawResponse if it exists
-				if ((result as any).rawResponse) {
-					logger.debug(`[API Response] Raw response exists`);
-					try {
-						const rawResp = (result as any).rawResponse;
-						logger.debug(`[API Response] Raw response keys: ${JSON.stringify(Object.keys(rawResp))}`);
-						logger.debug(`[API Response] Raw response: ${JSON.stringify(rawResp)}`);
-					} catch (e) {
-						logger.debug(`[API Response] Could not stringify raw response: ${e}`);
-					}
-				}
-				
-				// Log the experimental_providerMetadata if it exists
-				if ((result as any).experimental_providerMetadata) {
-					logger.debug(`[API Response] Provider metadata: ${JSON.stringify((result as any).experimental_providerMetadata)}`);
-				}
-				
-				// Log response metadata if it exists
-				if ((result as any).response) {
-					logger.debug(`[API Response] Response object: ${JSON.stringify((result as any).response)}`);
+				// Check for _totalUsage private property (Vercel AI SDK internal)
+				const totalUsage = (result as any)._totalUsage;
+				if (totalUsage) {
+					logger.debug(`[API Response] Found _totalUsage: ${JSON.stringify(totalUsage)}`);
 				}
 				
 				logger.debug(`[API Usage] Raw vercelUsage object: ${JSON.stringify(vercelUsage)}`);
+				
+				// Use _totalUsage if vercelUsage is empty but _totalUsage exists
+				const actualUsage = (vercelUsage && Object.keys(vercelUsage).length > 0) ? vercelUsage : totalUsage;
+				
+				if (actualUsage) {
+					logger.debug(`[API Usage] Using ${actualUsage === totalUsage ? '_totalUsage' : 'result.usage'}`);
+				}
 
 				// Convert Vercel AI SDK usage to our ApiUsageData format
-				if (vercelUsage) {
+				if (actualUsage) {
 					responseLog.usage = {
-						prompt_tokens: vercelUsage.inputTokens ?? 0,
-						completion_tokens: vercelUsage.outputTokens ?? 0,
-						total_tokens: vercelUsage.totalTokens ?? 0,
+						prompt_tokens: actualUsage.promptTokens ?? 0,
+						completion_tokens: actualUsage.completionTokens ?? 0,
+						total_tokens: actualUsage.totalTokens ?? 0,
 					};
 
 					// [DEBUG] Log API usage data
-					logger.debug(`[API Usage] Input Tokens: ${vercelUsage.inputTokens ?? 0}`);
-					logger.debug(`[API Usage] Output Tokens: ${vercelUsage.outputTokens ?? 0}`);
-					logger.debug(`[API Usage] Total Tokens: ${vercelUsage.totalTokens ?? 0}`);
+					logger.debug(`[API Usage] Input Tokens: ${actualUsage.promptTokens ?? 0}`);
+					logger.debug(`[API Usage] Output Tokens: ${actualUsage.completionTokens ?? 0}`);
+					logger.debug(`[API Usage] Total Tokens: ${actualUsage.totalTokens ?? 0}`);
 					logger.debug(`[API Usage] Response usage: ${JSON.stringify(responseLog.usage)}`);
 
 					// Update the request's usage with actual values from the API response
@@ -198,9 +189,9 @@ export abstract class ProviderClient {
 					const existingLog = messageLogger.get().find(log => log.id === interactionId);
 					if (existingLog?.request) {
 						existingLog.request.usage = {
-							prompt_tokens: vercelUsage.inputTokens ?? estimatedInputTokens,
+							prompt_tokens: actualUsage.promptTokens ?? estimatedInputTokens,
 							completion_tokens: 0, // Request doesn't have completion tokens
-							total_tokens: vercelUsage.inputTokens ?? estimatedInputTokens,
+							total_tokens: actualUsage.promptTokens ?? estimatedInputTokens,
 						};
 						logger.debug(`[API Usage] Updated request usage: ${JSON.stringify(existingLog.request.usage)}`);
 					}
