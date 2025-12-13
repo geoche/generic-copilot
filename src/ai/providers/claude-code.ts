@@ -130,8 +130,32 @@ export class ClaudeCodeProviderClient extends ProviderClient {
 		// Add usage information after streaming completes
 		const vercelUsage = await result.usage;
 		
-		// [DEBUG] Log raw vercelUsage object to see what API returns
+		// [DEBUG] Log raw API response to see what the API actually returns
 		logger.debug(`[API Usage] Model: ${config.id}, Request ID: ${interactionId}`);
+		logger.debug(`[API Response] Full result object keys: ${JSON.stringify(Object.keys(result))}`);
+		
+		// Try to access rawResponse if it exists
+		if ((result as any).rawResponse) {
+			logger.debug(`[API Response] Raw response exists`);
+			try {
+				const rawResp = (result as any).rawResponse;
+				logger.debug(`[API Response] Raw response keys: ${JSON.stringify(Object.keys(rawResp))}`);
+				logger.debug(`[API Response] Raw response: ${JSON.stringify(rawResp)}`);
+			} catch (e) {
+				logger.debug(`[API Response] Could not stringify raw response: ${e}`);
+			}
+		}
+		
+		// Log the experimental_providerMetadata if it exists
+		if ((result as any).experimental_providerMetadata) {
+			logger.debug(`[API Response] Provider metadata: ${JSON.stringify((result as any).experimental_providerMetadata)}`);
+		}
+		
+		// Log response metadata if it exists
+		if ((result as any).response) {
+			logger.debug(`[API Response] Response object: ${JSON.stringify((result as any).response)}`);
+		}
+		
 		logger.debug(`[API Usage] Raw vercelUsage object: ${JSON.stringify(vercelUsage)}`);
 		
 		// Convert Vercel AI SDK usage to our ApiUsageData format
