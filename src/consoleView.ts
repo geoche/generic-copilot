@@ -70,8 +70,17 @@ export class ConsoleViewProvider implements vscode.WebviewViewProvider {
 						timestamp: log.request.timestamp?.toISOString(),
 						modelId: log.request.modelConfig.id,
 						modelSlug: log.request.modelConfig.slug,
+						modelContextLength: log.request.modelConfig.model_properties?.context_length,
 						messageCount: log.request.vscodeMessages.length,
 						toolsCount: log.request.vercelTools ? Object.keys(log.request.vercelTools).length : 0,
+						// Only actual usage data
+						usage: log.request.usage
+							? {
+									prompt_tokens: log.request.usage.prompt_tokens,
+									completion_tokens: log.request.usage.completion_tokens,
+									total_tokens: log.request.usage.total_tokens,
+							  }
+							: undefined,
 						messages: log.request.vscodeMessages.map((msg: any) => ({
 							role: msg.role,
 							// If content is already a raw string, just use it
