@@ -130,6 +130,10 @@ export class ClaudeCodeProviderClient extends ProviderClient {
 		// Add usage information after streaming completes
 		const vercelUsage = await result.usage;
 		
+		// [DEBUG] Log raw vercelUsage object to see what API returns
+		logger.debug(`[API Usage] Model: ${config.id}, Request ID: ${interactionId}`);
+		logger.debug(`[API Usage] Raw vercelUsage object: ${JSON.stringify(vercelUsage)}`);
+		
 		// Convert Vercel AI SDK usage to our ApiUsageData format
 		if (vercelUsage) {
 			responseLog.usage = {
@@ -139,7 +143,6 @@ export class ClaudeCodeProviderClient extends ProviderClient {
 			};
 
 			// [DEBUG] Log API usage data
-			logger.debug(`[API Usage] Model: ${config.id}, Request ID: ${interactionId}`);
 			logger.debug(`[API Usage] Input Tokens: ${vercelUsage.inputTokens ?? 0}`);
 			logger.debug(`[API Usage] Output Tokens: ${vercelUsage.outputTokens ?? 0}`);
 			logger.debug(`[API Usage] Total Tokens: ${vercelUsage.totalTokens ?? 0}`);
