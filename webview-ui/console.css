@@ -138,3 +138,173 @@ button:hover {
 .interaction-list-meta .meta-left { font-size: 0.82em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .interaction-list-meta .meta-right { font-size: 0.76em; color: var(--vscode-descriptionForeground); flex: 0 0 auto; white-space: nowrap; }
 .interaction-list-stats { color: var(--vscode-descriptionForeground); font-size: 0.78em; margin-top: 2px; }
+
+/* Context Banner Styles */
+.context-banner {
+	padding: 8px 12px;
+	margin-bottom: 12px;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+	background: var(--vscode-editor-background);
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+/* Context Window Progress */
+.context-progress {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 20px;
+}
+
+.token-count {
+	font-size: 0.85em;
+	font-weight: 500;
+	color: var(--vscode-foreground);
+	min-width: 50px;
+	text-align: right;
+}
+
+.max-tokens {
+	font-size: 0.75em;
+	color: var(--vscode-descriptionForeground);
+	min-width: 50px;
+}
+
+.progress-bar {
+	flex: 1;
+	height: 6px;
+	border-radius: 3px;
+	background: color-mix(in srgb, var(--vscode-foreground) 20%, transparent);
+	overflow: hidden;
+	display: flex;
+	min-width: 120px;
+}
+
+.progress-bar .used {
+	background: var(--vscode-foreground);
+	transition: width 0.3s ease;
+	border-radius: 3px 0 0 3px;
+}
+
+.progress-bar .reserved {
+	background: color-mix(in srgb, var(--vscode-foreground) 40%, transparent);
+	border-radius: 0 3px 3px 0;
+}
+
+/* Token Counters */
+.token-counters {
+	display: flex;
+	gap: 12px;
+	font-size: 0.8em;
+	align-items: center;
+}
+
+.tokens-label {
+	font-weight: 500;
+	color: var(--vscode-foreground);
+	min-width: 40px;
+}
+
+.tokens-in,
+.tokens-out {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--vscode-foreground);
+}
+
+.tokens-in .arrow {
+	color: #4a9eff;
+	font-weight: bold;
+}
+
+.tokens-out .arrow {
+	color: #6cc644;
+	font-weight: bold;
+}
+
+/* Session Timeline */
+.session-timeline {
+	display: flex;
+	align-items: flex-end;
+	height: 32px;
+	gap: 3px;
+	overflow-x: auto;
+	padding: 4px 0;
+	border-bottom: 1px solid color-mix(in srgb, var(--vscode-panel-border) 60%, transparent);
+}
+
+.timeline-bar {
+	min-width: 8px;
+	border-radius: 3px 3px 0 0;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	position: relative;
+}
+
+.timeline-bar:hover {
+	opacity: 0.8;
+	transform: translateY(-1px);
+}
+
+.timeline-bar:focus {
+	outline: 2px solid var(--vscode-focusBorder);
+	outline-offset: 1px;
+}
+
+.timeline-bar.user {
+	background: #4a9eff;
+}
+
+.timeline-bar.assistant {
+	background: #6cc644;
+}
+
+.timeline-bar.system {
+	background: #888888;
+}
+
+.timeline-bar.tool {
+	background: #f0ad4e;
+}
+
+.timeline-bar.active {
+	animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+	0%,
+	100% {
+		opacity: 1;
+		transform: scaleY(1);
+	}
+	50% {
+		opacity: 0.7;
+		transform: scaleY(1.05);
+	}
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+	.context-banner {
+		padding: 6px 8px;
+		gap: 6px;
+	}
+
+	.token-counters {
+		gap: 8px;
+		font-size: 0.75em;
+	}
+
+	.session-timeline {
+		height: 28px;
+		gap: 2px;
+	}
+
+	.timeline-bar {
+		min-width: 6px;
+	}
+}
