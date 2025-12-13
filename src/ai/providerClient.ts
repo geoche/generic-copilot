@@ -158,6 +158,17 @@ export abstract class ProviderClient {
 						completion_tokens: vercelUsage.outputTokens ?? 0,
 						total_tokens: vercelUsage.totalTokens ?? 0,
 					};
+
+					// Update the request's usage with actual values from the API response
+					// This replaces the estimated tokens with actual usage data
+					const existingLog = messageLogger.get().find(log => log.id === interactionId);
+					if (existingLog?.request) {
+						existingLog.request.usage = {
+							prompt_tokens: vercelUsage.inputTokens ?? estimatedInputTokens,
+							completion_tokens: 0, // Request doesn't have completion tokens
+							total_tokens: vercelUsage.inputTokens ?? estimatedInputTokens,
+						};
+					}
 				}
 
 				// Calculate total text content length for display purposes
