@@ -3,12 +3,8 @@ import { LanguageModelChatInformation, LanguageModelChatRequestMessage, Cancella
 import { prepareTokenCount } from "./provideToken";
 import { logger } from "./outputLogger";
 export function initStatusBar(context: vscode.ExtensionContext): vscode.StatusBarItem {
-
 	// Create status bar item for token count display
-	const tokenCountStatusBarItem = vscode.window.createStatusBarItem(
-		vscode.StatusBarAlignment.Right,
-		100
-	);
+	const tokenCountStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
 	tokenCountStatusBarItem.name = "Token Count";
 	tokenCountStatusBarItem.text = "$(symbol-numeric) Ready";
 	tokenCountStatusBarItem.tooltip = "Current model token usage - Click to open configuration";
@@ -16,7 +12,7 @@ export function initStatusBar(context: vscode.ExtensionContext): vscode.StatusBa
 	context.subscriptions.push(tokenCountStatusBarItem);
 	// Show the status bar item initially
 	tokenCountStatusBarItem.show();
-	return tokenCountStatusBarItem
+	return tokenCountStatusBarItem;
 }
 
 /**
@@ -26,11 +22,11 @@ export function initStatusBar(context: vscode.ExtensionContext): vscode.StatusBa
  */
 export function formatTokenCount(value: number): string {
 	if (value >= 1_000_000_000) {
-		return (value / 1_000_000_000).toFixed(1) + 'B';
+		return (value / 1_000_000_000).toFixed(1) + "B";
 	} else if (value >= 1_000_000) {
-		return (value / 1_000_000).toFixed(1) + 'M';
+		return (value / 1_000_000).toFixed(1) + "M";
 	} else if (value >= 1_000) {
-		return (value / 1_000).toFixed(1) + 'K';
+		return (value / 1_000).toFixed(1) + "K";
 	}
 	return value.toLocaleString();
 }
@@ -42,7 +38,7 @@ export function formatTokenCount(value: number): string {
  * @returns Progress bar string (e.g., "▆ 75%")
  */
 export function createProgressBar(usedTokens: number, maxTokens: number): string {
-	const blocks = ["▁","▂","▃","▄","▅","▆","▇","█"];
+	const blocks = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
 	const usagePercentage = Math.min((usedTokens / maxTokens) * 100, 100);
 	const blockIndex = Math.min(Math.floor((usagePercentage / 100) * blocks.length), blocks.length - 1);
 
@@ -51,32 +47,42 @@ export function createProgressBar(usedTokens: number, maxTokens: number): string
 
 /**
  * Update the status bar with token usage information
+ *
+ * Uses estimated token counts for immediate feedback during API calls.
+ * The context banner shows actual API usage data from responses (prompt_tokens, completion_tokens).
+ *
  * @param messages The chat messages to count tokens for
  * @param model The language model information
  * @param statusBarItem The status bar item to update
- * @param provideTokenCount Callback function to count tokens for a message
  */
 export async function updateContextStatusBar(
-	tokens: number,
-	maxTokens: number,
-	statusBarItem: vscode.StatusBarItem,
+	messages: readonly LanguageModelChatRequestMessage[],
+	model: LanguageModelChatInformation,
+	statusBarItem: vscode.StatusBarItem
 ): Promise<void> {
 	// Loop through each message and count tokens
+	let totalTokenCount = 0;
+
+	for (const message of messages) {
+		const tokenCount = await prepareTokenCount(model, message, new CancellationTokenSource().token);
+		totalTokenCount += tokenCount;
+	}
 
 	// Update status bar with token count and model context window
-
+	const maxTokens = model.maxInputTokens + model.maxOutputTokens;
 
 	// Create visual progress bar with single progressive block
-	const progressBar = createProgressBar(tokens, maxTokens);
+	const progressBar = createProgressBar(totalTokenCount, maxTokens);
 	const displayText = `$(symbol-parameter) ${progressBar}`;
 	statusBarItem.text = displayText;
-	statusBarItem.tooltip = `Token Usage: ${tokens} / ${formatTokenCount(maxTokens)}\n\n${progressBar}\n\nClick to open configuration`;
+	statusBarItem.tooltip = `Token Usage: ${totalTokenCount} / ${formatTokenCount(maxTokens)}\n\n${progressBar}\n\nClick to open configuration`;
+
 	// Add color coding based on token usage
-	const usagePercentage = (tokens / maxTokens) * 100;
+	const usagePercentage = (totalTokenCount / maxTokens) * 100;
 	if (usagePercentage > 90) {
-		statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+		statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
 	} else if (usagePercentage > 70) {
-		statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+		statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
 	} else {
 		statusBarItem.backgroundColor = undefined;
 	}

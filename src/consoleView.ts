@@ -135,11 +135,10 @@ export class ConsoleViewProvider implements vscode.WebviewViewProvider {
 								name: tc.name,
 								input: tc.input,
 							})) ?? [],
-						// Include token usage data from Vercel AI SDK
+						// Include token usage data from API responses
 						usage: log.response.usage,
-						// Include performance metrics
-						durationMs: log.response.durationMs,
-						tokensPerSecond: log.response.tokensPerSecond,
+						// Include text content length
+						textContentLength: log.response.textContentLength,
 				  }
 				: undefined,
 		}));

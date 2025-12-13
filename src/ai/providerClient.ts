@@ -8,7 +8,6 @@ import {
 	LanguageModelResponsePart2 as LanguageModelResponsePart, //part of proposed api
 	CancellationToken,
 } from "vscode";
-import { updateContextStatusBar } from "../statusBar";
 import { z } from "zod";
 import * as vscode from "vscode";
 
@@ -16,13 +15,14 @@ import { generateText, JSONValue, streamText } from "ai";
 import { ModelItem, ProviderConfig, VercelType } from "../types";
 import { LM2VercelMessage, LM2VercelTool, normalizeToolInputs } from "./utils/conversion";
 import { ModelMessage, LanguageModel, Provider, ProviderMetadata } from "ai";
-import { MessageLogger, LoggedRequest, LoggedResponse, LoggedInteraction } from "./utils/messageLogger";
+import { MessageLogger, LoggedRequest, LoggedResponse, LoggedInteraction, ApiUsageData } from "./utils/messageLogger";
 import { logger } from "../outputLogger";
 import {
 	generateCompletionPromptInstruction,
 	completionSystemInstruction,
 	completionDescription,
 } from "../autocomplete/constants";
+import { estimateMessagesTokens } from "../provideToken";
 
 /**
  * Abstract base class for provider clients that interact with language model providers.
@@ -64,15 +64,16 @@ export abstract class ProviderClient {
 		options: ProvideLanguageModelChatResponseOptions,
 		config: ModelItem,
 		progress: Progress<LanguageModelResponsePart>,
-		statusBarItem: vscode.StatusBarItem,
 		providerOptions?: Record<string, Record<string, JSONValue>>
 	): Promise<void> {
 		const languageModel = this.getLanguageModel(config.slug);
 		const messages = this.convertMessages(request);
 		const tools = this.convertTools(options);
 		const messageLogger = MessageLogger.getInstance();
-		logger.debug(`Generating streaming response for model "${config.id}" with provider "${this.config.id}"`);
+		// Estimate input tokens as fallback (will be updated with real usage data if available)
+		const estimatedInputTokens = await estimateMessagesTokens(request);
 
+		logger.debug(`Generating streaming response for model "${config.id}" with provider "${this.config.id}"`);
 		//Log the incoming request as soon as possible.
 		const interactionId = messageLogger.addRequestResponse({
 			type: "request",
@@ -81,7 +82,13 @@ export abstract class ProviderClient {
 			vercelMessages: messages,
 			vercelTools: tools,
 			modelConfig: config,
-		} as LoggedRequest);
+			// Fallback estimation - will be updated with real usage if available
+			usage: {
+				prompt_tokens: estimatedInputTokens,
+				completion_tokens: 0,
+				total_tokens: estimatedInputTokens,
+			},
+		});
 
 		let lastError: any;
 		const maxRetries = config.retries ?? 3;
@@ -142,22 +149,21 @@ export abstract class ProviderClient {
 				this.processResponseMetadata(result);
 
 				// Add usage information after streaming completes
-				responseLog.usage = await result.usage;
+				const vercelUsage = await result.usage;
 
-				// Calculate duration
-				const endTime = Date.now();
-				responseLog.durationMs = endTime - startTime;
-
-				// Calculate tokens per second (whole number)
-				if (responseLog.usage?.outputTokens) {
-					const durationSeconds = responseLog.durationMs / 1000;
-					responseLog.tokensPerSecond = Math.round(responseLog.usage.outputTokens / durationSeconds);
+				// Convert Vercel AI SDK usage to our ApiUsageData format
+				if (vercelUsage) {
+					responseLog.usage = {
+						prompt_tokens: vercelUsage.inputTokens ?? 0,
+						completion_tokens: vercelUsage.outputTokens ?? 0,
+						total_tokens: vercelUsage.totalTokens ?? 0,
+					};
 				}
-				updateContextStatusBar(
-					responseLog.usage.totalTokens || 0,
-					config.model_properties.context_length || 0,
-					statusBarItem
-				);
+
+				// Calculate total text content length for display purposes
+				const totalTextLength = responseLog.textParts?.reduce((sum, part) => sum + part.value.length, 0) || 0;
+				responseLog.textContentLength = totalTextLength;
+
 				messageLogger.addRequestResponse(responseLog, interactionId);
 				return;
 			} catch (error) {

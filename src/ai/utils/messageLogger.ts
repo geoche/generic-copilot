@@ -8,12 +8,21 @@ import {
 	EventEmitter,
 	Event,
 } from "vscode";
-import { ModelMessage, StreamTextResult, LanguageModelUsage } from "ai";
+import { ModelMessage, StreamTextResult } from "ai";
 import { ModelItem } from "../../types";
 import { logger } from "../../outputLogger";
 /**
  * Types for logging request and response data
  */
+
+/**
+ * API usage data from actual API responses
+ */
+export interface ApiUsageData {
+	prompt_tokens: number;
+	completion_tokens: number;
+	total_tokens: number;
+}
 
 /**
  * Represents a request sent to the language model
@@ -37,6 +46,9 @@ export interface LoggedRequest {
 
 	/** Timestamp of the request */
 	timestamp?: Date;
+
+	/** Actual API usage data from response */
+	usage?: ApiUsageData;
 }
 
 /**
@@ -51,17 +63,14 @@ export interface LoggedResponse {
 	thinkingParts?: LanguageModelThinkingPart[];
 	toolCallParts?: LanguageModelToolCallPart[];
 
-	// /** Token usage information from the Vercel AI SDK */
-	usage?: LanguageModelUsage;
-
-	// /** Response duration in milliseconds */
-	durationMs?: number;
-
-	// /** Tokens per second generation rate */
-	tokensPerSecond?: number;
-
 	// /** Timestamp when response started */
 	timestamp?: Date;
+
+	/** Actual API usage data from response */
+	usage?: ApiUsageData;
+
+	/** Total text content length for display purposes only */
+	textContentLength?: number;
 }
 
 /**

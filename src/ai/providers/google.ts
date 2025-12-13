@@ -38,7 +38,6 @@ export class GoogleProviderClient extends ProviderClient {
 		options: ProvideLanguageModelChatResponseOptions,
 		config: ModelItem,
 		progress: Progress<LanguageModelResponsePart>,
-		statusBarItem: vscode.StatusBarItem,
 		_providerOptions?: Record<string, Record<string, JSONValue>>
 	): Promise<void> {
 		// Provide Google-specific provider options
@@ -50,7 +49,7 @@ export class GoogleProviderClient extends ProviderClient {
 			} satisfies GoogleGenerativeAIProviderOptions,
 		};
 
-		return super.generateStreamingResponse(request, options, config, progress, statusBarItem, providerOptions);
+		return super.generateStreamingResponse(request, options, config, progress, providerOptions);
 	}
 
 	/**

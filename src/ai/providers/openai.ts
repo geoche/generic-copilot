@@ -30,7 +30,6 @@ export class OpenAIProviderClient extends ProviderClient {
 		options: ProvideLanguageModelChatResponseOptions,
 		config: ModelItem,
 		progress: Progress<LanguageModelResponsePart>,
-		statusBarItem: vscode.StatusBarItem,
 		_providerOptions?: Record<string, Record<string, JSONValue>>
 	): Promise<void> {
 		// Check for cached previousResponseId from the last response
@@ -54,7 +53,7 @@ export class OpenAIProviderClient extends ProviderClient {
 			} satisfies OpenAIResponsesProviderOptions,
 		};
 
-		return super.generateStreamingResponse(request, options, config, progress, statusBarItem, providerOptions);
+		return super.generateStreamingResponse(request, options, config, progress, providerOptions);
 	}
 
 	/**

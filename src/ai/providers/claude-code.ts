@@ -15,7 +15,7 @@ import { ProviderConfig, ModelItem } from "../../types";
 import * as vscode from "vscode";
 import { JSONValue } from "ai";
 import { logger } from "../../outputLogger";
-import { LoggedRequest, LoggedResponse, MessageLogger } from "../utils/messageLogger";
+import { LoggedRequest, LoggedResponse, MessageLogger, ApiUsageData } from "../utils/messageLogger";
 import { normalizeToolInputs } from "../utils/conversion";
 
 // Dynamic import for ESM module - using any type to avoid TS1479 error
@@ -62,15 +62,13 @@ export class ClaudeCodeProviderClient extends ProviderClient {
 	}
 
 	/**
-	 * Provides Google-specific provider options for streaming responses.
-	 * The base class handles providerMetadata caching for tool calls (e.g., thoughtSignature).
+	 * Provides Claude Code-specific streaming response implementation.
 	 */
 	async generateStreamingResponse(
 		request: LanguageModelChatRequestMessage[],
 		options: ProvideLanguageModelChatResponseOptions,
 		config: ModelItem,
 		progress: Progress<LanguageModelResponsePart>,
-		statusBarItem: vscode.StatusBarItem,
 		_providerOptions?: Record<string, Record<string, JSONValue>>
 	): Promise<void> {
 		await this.ensureProviderInitialized();
@@ -84,6 +82,11 @@ export class ClaudeCodeProviderClient extends ProviderClient {
 			vercelMessages: messages,
 			vercelTools: {},
 			modelConfig: config,
+			usage: {
+				prompt_tokens: 0,
+				completion_tokens: 0,
+				total_tokens: 0,
+			},
 		} as LoggedRequest);
 		let streamError: any;
 		const result = streamText({
@@ -123,18 +126,25 @@ export class ClaudeCodeProviderClient extends ProviderClient {
 		if (streamError) {
 			throw streamError;
 		}
-		const endTime = Date.now();
-		responseLog.durationMs = endTime - startTime;
-		responseLog.usage = await result.usage;
-		if (responseLog.usage?.outputTokens) {
-			const durationSeconds = responseLog.durationMs / 1000;
-			responseLog.tokensPerSecond = Math.round(responseLog.usage.outputTokens / durationSeconds);
+		
+		// Add usage information after streaming completes
+		const vercelUsage = await result.usage;
+		
+		// Convert Vercel AI SDK usage to our ApiUsageData format
+		if (vercelUsage) {
+			responseLog.usage = {
+				prompt_tokens: vercelUsage.inputTokens ?? 0,
+				completion_tokens: vercelUsage.outputTokens ?? 0,
+				total_tokens: vercelUsage.totalTokens ?? 0,
+			};
 		}
+
+		// Calculate total text content length for display purposes
+		const totalTextLength = responseLog.textParts?.reduce((sum, part) => sum + part.value.length, 0) || 0;
+		responseLog.textContentLength = totalTextLength;
+
 		messageLogger.addRequestResponse(responseLog, interactionId);
 		return;
-		``;
-
-		// return super.generateStreamingResponse(request, options, config, progress, statusBarItem, _providerOptions);
 	}
 
 	private stripWorkspaceRootFromPath(filePath: string): string {
