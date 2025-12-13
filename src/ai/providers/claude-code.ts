@@ -138,6 +138,13 @@ export class ClaudeCodeProviderClient extends ProviderClient {
 				total_tokens: vercelUsage.totalTokens ?? 0,
 			};
 
+			// [DEBUG] Log API usage data
+			logger.debug(`[API Usage] Model: ${config.id}, Request ID: ${interactionId}`);
+			logger.debug(`[API Usage] Input Tokens: ${vercelUsage.inputTokens ?? 0}`);
+			logger.debug(`[API Usage] Output Tokens: ${vercelUsage.outputTokens ?? 0}`);
+			logger.debug(`[API Usage] Total Tokens: ${vercelUsage.totalTokens ?? 0}`);
+			logger.debug(`[API Usage] Response usage: ${JSON.stringify(responseLog.usage)}`);
+
 			// Update the request's usage with actual values from the API response
 			// This replaces the estimated tokens with actual usage data
 			const existingLog = messageLogger.get().find(log => log.id === interactionId);
@@ -147,6 +154,7 @@ export class ClaudeCodeProviderClient extends ProviderClient {
 					completion_tokens: 0, // Request doesn't have completion tokens
 					total_tokens: vercelUsage.inputTokens ?? 0,
 				};
+				logger.debug(`[API Usage] Updated request usage: ${JSON.stringify(existingLog.request.usage)}`);
 			}
 		}
 

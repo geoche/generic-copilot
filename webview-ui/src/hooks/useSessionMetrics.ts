@@ -51,6 +51,9 @@ export const useSessionMetrics = (logs: LogMessage[]): { metrics: SessionMetrics
 			if (log.response?.usage?.completion_tokens !== undefined) {
 				const completionTokens = log.response.usage.completion_tokens;
 				sessionOutputTokens += completionTokens;
+				console.log('[DEBUG] Found completion tokens:', completionTokens, 'from log:', log.id, 'Total output now:', sessionOutputTokens);
+			} else {
+				console.log('[DEBUG] No completion tokens in log:', log.id, 'Response usage:', log.response?.usage);
 			}
 
 			// Create timeline (unchanged - just for visualization)
