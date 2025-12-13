@@ -35,13 +35,3 @@ export const calculateTimelineSizes = (messages: TimelineMessage[]): TimelineBar
 		return { heightPercent, width };
 	});
 };
-
-/**
- * Calculate minimum and maximum bounds for a set of values
- */
-const getBounds = (values: number[]): { min: number; max: number } => {
-	return {
-		min: Math.min(...values),
-		max: Math.max(...values),
-	};
-};
