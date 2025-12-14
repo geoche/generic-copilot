@@ -142,7 +142,17 @@ export abstract class ProviderClient {
 				this.processResponseMetadata(result);
 
 				// Add usage information after streaming completes
-				responseLog.usage = await result.usage;
+				// The AI SDK's usage property can be a Promise or direct object
+				// We need to handle both AI SDK format (inputTokens/outputTokens) and raw API format (prompt_tokens/completion_tokens)
+				const usageData = await result.usage;
+				if (usageData) {
+					// Map from AI SDK format or raw API format to our expected format
+					responseLog.usage = {
+						inputTokens: (usageData as any).inputTokens ?? (usageData as any).prompt_tokens,
+						outputTokens: (usageData as any).outputTokens ?? (usageData as any).completion_tokens,
+						totalTokens: (usageData as any).totalTokens ?? (usageData as any).total_tokens,
+					};
+				}
 
 				// Calculate duration
 				const endTime = Date.now();
@@ -154,7 +164,7 @@ export abstract class ProviderClient {
 					responseLog.tokensPerSecond = Math.round(responseLog.usage.outputTokens / durationSeconds);
 				}
 				updateContextStatusBar(
-					responseLog.usage.totalTokens || 0,
+					responseLog.usage?.totalTokens || 0,
 					config.model_properties.context_length || 0,
 					statusBarItem
 				);

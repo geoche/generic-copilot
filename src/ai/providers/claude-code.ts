@@ -125,7 +125,15 @@ export class ClaudeCodeProviderClient extends ProviderClient {
 		}
 		const endTime = Date.now();
 		responseLog.durationMs = endTime - startTime;
-		responseLog.usage = await result.usage;
+		// Handle usage data from AI SDK, supporting both AI SDK format and raw API format
+		const usageData = await result.usage;
+		if (usageData) {
+			responseLog.usage = {
+				inputTokens: (usageData as any).inputTokens ?? (usageData as any).prompt_tokens,
+				outputTokens: (usageData as any).outputTokens ?? (usageData as any).completion_tokens,
+				totalTokens: (usageData as any).totalTokens ?? (usageData as any).total_tokens,
+			};
+		}
 		if (responseLog.usage?.outputTokens) {
 			const durationSeconds = responseLog.durationMs / 1000;
 			responseLog.tokensPerSecond = Math.round(responseLog.usage.outputTokens / durationSeconds);
