@@ -27,8 +27,5 @@ export interface SessionTimelineProps {
 	onMessageClick?: (id: string) => void;
 }
 
-export interface TokenDistributionResult {
-	currentPercent: number;
-	availablePercent: number;
-	availableSize: number;
-}
+// Re-export TokenDistributionResult from utils to avoid duplication
+export type { TokenDistributionResult } from "../../utils/tokenDistribution";
