@@ -15,7 +15,7 @@ import * as vscode from "vscode";
 
 import { generateText, JSONValue, streamText } from "ai";
 import { ModelItem, ProviderConfig, VercelType } from "../types";
-import { LM2VercelMessage, LM2VercelTool, normalizeToolInputs, mapUsageData } from "./utils/conversion";
+import { LM2VercelMessage, LM2VercelTool, normalizeToolInputs } from "./utils/conversion";
 import { ModelMessage, LanguageModel, Provider, ProviderMetadata } from "ai";
 import { MessageLogger, LoggedRequest, LoggedResponse, LoggedInteraction } from "./utils/messageLogger";
 import { logger } from "../outputLogger";
@@ -113,20 +113,15 @@ export abstract class ProviderClient {
 					}
 				});
 
-				// Track content length for fallback usage estimation
-				let totalContentLength = 0;
-
 				// We need to handle fullStream to get tool calls
 				for await (const part of result.fullStream) {
 					if (part.type === "reasoning-delta") {
 						const thinkingPart = new LanguageModelThinkingPart(part.text, part.id);
 						responseLog.thinkingParts?.push(thinkingPart);
-						totalContentLength += part.text.length;
 						progress.report(thinkingPart);
 					} else if (part.type === "text-delta") {
 						const textPart = new LanguageModelTextPart(part.text);
 						responseLog.textParts?.push(textPart);
-						totalContentLength += part.text.length;
 						progress.report(new LanguageModelTextPart(part.text));
 					} else if (part.type === "tool-call") {
 						const normalizedInput = normalizeToolInputs(part.toolName, part.input);
@@ -137,7 +132,6 @@ export abstract class ProviderClient {
 						this.processToolCallMetadata(part.toolCallId, part.providerMetadata);
 
 						responseLog.toolCallParts?.push(toolCall);
-						totalContentLength += part.toolName.length + JSON.stringify(part.input).length;
 						progress.report(toolCall);
 					}
 				}
@@ -148,36 +142,17 @@ export abstract class ProviderClient {
 				// Allow subclasses to process response-level metadata (e.g., OpenAI's responseId)
 				this.processResponseMetadata(result);
 
-				// Extract usage data with fallback estimation
-				// The AI SDK's usage properties exist but aren't populated for openai-compatible provider
-				// Use content-based estimation as fallback
+				// Estimate usage based on content length (AI SDK doesn't provide accurate usage for openai-compatible providers)
 				const estimatedInputTokens = await estimateMessagesTokens(request);
-				const estimatedOutputTokens = Math.ceil(totalContentLength / 4);
-				
-				let finalUsage: { inputTokens: number | undefined; outputTokens: number | undefined; totalTokens: number | undefined } = {
+				const totalTextLength = responseLog.textParts?.reduce((sum, part) => sum + part.value.length, 0) || 0;
+				const estimatedOutputTokens = Math.ceil(totalTextLength / 4); // ~4 chars per token
+
+				responseLog.usage = {
 					inputTokens: estimatedInputTokens,
 					outputTokens: estimatedOutputTokens,
 					totalTokens: estimatedInputTokens + estimatedOutputTokens,
 				};
-				
-				logger.debug(`Estimated usage from content length: ${JSON.stringify(finalUsage)}`);
-				
-				// Try to get actual usage from AI SDK (though it's been empty so far)
-				try {
-					const usageData = await result.usage;
-					const mappedUsage = mapUsageData(usageData);
-					// Only use if we got actual values
-					if (mappedUsage && (mappedUsage.inputTokens !== undefined || mappedUsage.outputTokens !== undefined || mappedUsage.totalTokens !== undefined)) {
-						logger.debug(`Got usage from AI SDK: ${JSON.stringify(mappedUsage)}`);
-						finalUsage = mappedUsage;
-					} else {
-						logger.debug(`AI SDK usage empty, using estimated values`);
-					}
-				} catch (e) {
-					logger.error(`Error getting usage from AI SDK: ${e}, using estimated values`);
-				}
-				
-				responseLog.usage = finalUsage;
+				responseLog.textContentLength = totalTextLength;
 
 				// Calculate duration
 				const endTime = Date.now();
@@ -189,7 +164,7 @@ export abstract class ProviderClient {
 					responseLog.tokensPerSecond = Math.round(responseLog.usage.outputTokens / durationSeconds);
 				}
 				updateContextStatusBar(
-					responseLog.usage?.totalTokens || 0,
+					responseLog.usage.totalTokens || 0,
 					config.model_properties.context_length || 0,
 					statusBarItem
 				);

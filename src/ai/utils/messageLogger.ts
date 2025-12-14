@@ -60,6 +60,9 @@ export interface LoggedResponse {
 	// /** Tokens per second generation rate */
 	tokensPerSecond?: number;
 
+	// /** Total text content length for display */
+	textContentLength?: number;
+
 	// /** Timestamp when response started */
 	timestamp?: Date;
 }
