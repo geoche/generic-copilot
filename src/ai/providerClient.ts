@@ -150,12 +150,23 @@ export abstract class ProviderClient {
 				// Allow subclasses to process response-level metadata (e.g., OpenAI's responseId)
 				this.processResponseMetadata(result);
 
-				// Fallback: if usage wasn't set from finish event or has no values, try awaiting result.usage
+				// Fallback: if usage wasn't set from finish event or has no values, try awaiting result.totalUsage and result.usage
 				if (!responseLog.usage || (responseLog.usage.inputTokens === undefined && responseLog.usage.outputTokens === undefined && responseLog.usage.totalTokens === undefined)) {
-					logger.debug(`No valid usage from finish event, awaiting result.usage...`);
-					const usageData = await result.usage;
-					logger.debug(`Usage data received, type: ${typeof usageData}, isNull: ${usageData === null}, isUndefined: ${usageData === undefined}`);
-					responseLog.usage = mapUsageData(usageData);
+					logger.debug(`No valid usage from finish event, trying result.totalUsage...`);
+					// Try totalUsage first (sum of all steps)
+					const totalUsageData = await (result as any).totalUsage;
+					logger.debug(`totalUsage received, type: ${typeof totalUsageData}, value: ${JSON.stringify(totalUsageData)}`);
+					
+					if (totalUsageData && (totalUsageData.inputTokens !== undefined || totalUsageData.outputTokens !== undefined || totalUsageData.totalTokens !== undefined)) {
+						responseLog.usage = mapUsageData(totalUsageData);
+						logger.debug(`Using totalUsage: ${JSON.stringify(responseLog.usage)}`);
+					} else {
+						// Fallback to usage (single step)
+						logger.debug(`No valid totalUsage, trying result.usage...`);
+						const usageData = await result.usage;
+						logger.debug(`usage received, type: ${typeof usageData}, value: ${JSON.stringify(usageData)}`);
+						responseLog.usage = mapUsageData(usageData);
+					}
 				}
 
 				// Calculate duration
