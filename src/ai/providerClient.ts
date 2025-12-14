@@ -14,7 +14,7 @@ import * as vscode from "vscode";
 
 import { generateText, JSONValue, streamText } from "ai";
 import { ModelItem, ProviderConfig, VercelType } from "../types";
-import { LM2VercelMessage, LM2VercelTool, normalizeToolInputs } from "./utils/conversion";
+import { LM2VercelMessage, LM2VercelTool, normalizeToolInputs, mapUsageData } from "./utils/conversion";
 import { ModelMessage, LanguageModel, Provider, ProviderMetadata } from "ai";
 import { MessageLogger, LoggedRequest, LoggedResponse, LoggedInteraction } from "./utils/messageLogger";
 import { logger } from "../outputLogger";
@@ -142,17 +142,9 @@ export abstract class ProviderClient {
 				this.processResponseMetadata(result);
 
 				// Add usage information after streaming completes
-				// The AI SDK's usage property can be a Promise or direct object
-				// We need to handle both AI SDK format (inputTokens/outputTokens) and raw API format (prompt_tokens/completion_tokens)
+				// Handle both AI SDK format and raw API format
 				const usageData = await result.usage;
-				if (usageData) {
-					// Map from AI SDK format or raw API format to our expected format
-					responseLog.usage = {
-						inputTokens: (usageData as any).inputTokens ?? (usageData as any).prompt_tokens,
-						outputTokens: (usageData as any).outputTokens ?? (usageData as any).completion_tokens,
-						totalTokens: (usageData as any).totalTokens ?? (usageData as any).total_tokens,
-					};
-				}
+				responseLog.usage = mapUsageData(usageData);
 
 				// Calculate duration
 				const endTime = Date.now();

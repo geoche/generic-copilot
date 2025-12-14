@@ -218,3 +218,22 @@ export function LM2VercelMessage(messages: readonly LanguageModelChatRequestMess
 	}
 	return messagesPayload;
 }
+
+/**
+ * Maps usage data from various provider formats to the standard LanguageModelV2Usage format.
+ * Handles both AI SDK format (camelCase) and raw API format (snake_case).
+ * 
+ * @param usageData - The usage data object from the provider (can be undefined)
+ * @returns A normalized LanguageModelV2Usage object or undefined if no data provided
+ */
+export function mapUsageData(usageData: any): { inputTokens: number | undefined; outputTokens: number | undefined; totalTokens: number | undefined } | undefined {
+	if (!usageData) {
+		return undefined;
+	}
+	
+	return {
+		inputTokens: usageData.inputTokens ?? usageData.prompt_tokens,
+		outputTokens: usageData.outputTokens ?? usageData.completion_tokens,
+		totalTokens: usageData.totalTokens ?? usageData.total_tokens,
+	};
+}

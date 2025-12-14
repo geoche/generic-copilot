@@ -16,7 +16,7 @@ import * as vscode from "vscode";
 import { JSONValue } from "ai";
 import { logger } from "../../outputLogger";
 import { LoggedRequest, LoggedResponse, MessageLogger } from "../utils/messageLogger";
-import { normalizeToolInputs } from "../utils/conversion";
+import { normalizeToolInputs, mapUsageData } from "../utils/conversion";
 
 // Dynamic import for ESM module - using any type to avoid TS1479 error
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -127,13 +127,7 @@ export class ClaudeCodeProviderClient extends ProviderClient {
 		responseLog.durationMs = endTime - startTime;
 		// Handle usage data from AI SDK, supporting both AI SDK format and raw API format
 		const usageData = await result.usage;
-		if (usageData) {
-			responseLog.usage = {
-				inputTokens: (usageData as any).inputTokens ?? (usageData as any).prompt_tokens,
-				outputTokens: (usageData as any).outputTokens ?? (usageData as any).completion_tokens,
-				totalTokens: (usageData as any).totalTokens ?? (usageData as any).total_tokens,
-			};
-		}
+		responseLog.usage = mapUsageData(usageData);
 		if (responseLog.usage?.outputTokens) {
 			const durationSeconds = responseLog.durationMs / 1000;
 			responseLog.tokensPerSecond = Math.round(responseLog.usage.outputTokens / durationSeconds);
