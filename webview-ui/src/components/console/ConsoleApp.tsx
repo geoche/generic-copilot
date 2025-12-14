@@ -2,18 +2,15 @@ import React, { useEffect, useState } from 'react';
 import Interaction from './Interaction';
 import InteractionListItem from './InteractionListItem';
 import InteractionList from './InteractionList';
+import { ContextBanner } from '../context-banner/ContextBanner';
+import { useSessionMetrics } from '../../hooks/useSessionMetrics';
+import { LogMessage } from '../../types';
 
 declare function acquireVsCodeApi(): {
     postMessage: (message: any) => void;
     setState: (state: any) => void;
     getState: () => any;
 };
-
-interface LogMessage {
-    id: string;
-    request?: any;
-    response?: any;
-}
 
 export const ConsoleApp: React.FC = () => {
     const [logs, setLogs] = useState<LogMessage[]>([]);
@@ -113,12 +110,31 @@ export const ConsoleApp: React.FC = () => {
         return el.innerHTML;
     }
 
+    function handleTimelineClick(messageId: string) {
+        // Handle timeline message click - could scroll to interaction or highlight it
+        console.log('Timeline message clicked:', messageId);
+
+        // Try to extract interaction ID from message ID (format: "interactionId-request/response")
+        const interactionId = messageId.split('-')[0];
+        if (interactionId && logs.some(log => log.id === interactionId)) {
+            setSelectedId(interactionId);
+        }
+    }
+
+    const { metrics: sessionMetrics, timeline: timelineMessages } = useSessionMetrics(logs);
+
     return (
         <div style={{ padding: 10, color: 'var(--vscode-foreground)' }}>
             <div style={{ marginBottom: 10, display: 'flex', gap: 8 }}>
                 <button onClick={refresh}>Refresh</button>
                 <button onClick={clearAll}>Clear All</button>
             </div>
+            <ContextBanner
+                metrics={sessionMetrics}
+                timeline={timelineMessages}
+                isActive={logs.length > 0}
+                onTimelineClick={handleTimelineClick}
+            />
 
             <div id="content" className="console-container">
                 <InteractionList logs={logs} onSelectionChange={(id) => setSelectedId(id)} />
