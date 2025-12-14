@@ -9,6 +9,7 @@ import {
 	CancellationToken,
 } from "vscode";
 import { updateContextStatusBar } from "../statusBar";
+import { estimateMessagesTokens } from "../provideToken";
 import { z } from "zod";
 import * as vscode from "vscode";
 
@@ -112,15 +113,20 @@ export abstract class ProviderClient {
 					}
 				});
 
+				// Track content length for fallback usage estimation
+				let totalContentLength = 0;
+
 				// We need to handle fullStream to get tool calls
 				for await (const part of result.fullStream) {
 					if (part.type === "reasoning-delta") {
 						const thinkingPart = new LanguageModelThinkingPart(part.text, part.id);
 						responseLog.thinkingParts?.push(thinkingPart);
+						totalContentLength += part.text.length;
 						progress.report(thinkingPart);
 					} else if (part.type === "text-delta") {
 						const textPart = new LanguageModelTextPart(part.text);
 						responseLog.textParts?.push(textPart);
+						totalContentLength += part.text.length;
 						progress.report(new LanguageModelTextPart(part.text));
 					} else if (part.type === "tool-call") {
 						const normalizedInput = normalizeToolInputs(part.toolName, part.input);
@@ -131,16 +137,8 @@ export abstract class ProviderClient {
 						this.processToolCallMetadata(part.toolCallId, part.providerMetadata);
 
 						responseLog.toolCallParts?.push(toolCall);
+						totalContentLength += part.toolName.length + JSON.stringify(part.input).length;
 						progress.report(toolCall);
-					} else if (part.type === "finish") {
-						// Extract usage data from the finish event
-						logger.debug(`Finish event received with totalUsage`);
-						const finishUsage = mapUsageData((part as any).totalUsage);
-						// Only use finish event usage if it has actual values
-						if (finishUsage && (finishUsage.inputTokens !== undefined || finishUsage.outputTokens !== undefined || finishUsage.totalTokens !== undefined)) {
-							responseLog.usage = finishUsage;
-							logger.debug(`Usage set from finish event: ${JSON.stringify(finishUsage)}`);
-						}
 					}
 				}
 				if (streamError) {
@@ -150,49 +148,36 @@ export abstract class ProviderClient {
 				// Allow subclasses to process response-level metadata (e.g., OpenAI's responseId)
 				this.processResponseMetadata(result);
 
-				// Fallback: if usage wasn't set from finish event or has no values, try accessing raw response
-				if (!responseLog.usage || (responseLog.usage.inputTokens === undefined && responseLog.usage.outputTokens === undefined && responseLog.usage.totalTokens === undefined)) {
-					logger.debug(`No valid usage from finish event, trying to access response object...`);
-					
-					// Try to access the response object which may have raw data
-					try {
-						const responseData = await (result as any).response;
-						logger.debug(`response object type: ${typeof responseData}`);
-						logger.debug(`response object keys: ${responseData ? Object.keys(responseData).join(', ') : 'null'}`);
-						
-						// Check if response has rawResponse with usage
-						if (responseData && (responseData as any).rawResponse) {
-							logger.debug(`rawResponse exists, type: ${typeof (responseData as any).rawResponse}`);
-							logger.debug(`rawResponse: ${JSON.stringify((responseData as any).rawResponse)}`);
-							
-							// Try to extract usage from rawResponse
-							const rawResp = (responseData as any).rawResponse;
-							if (rawResp && rawResp.body) {
-								logger.debug(`rawResponse.body: ${JSON.stringify(rawResp.body)}`);
-								const parsedBody = typeof rawResp.body === 'string' ? JSON.parse(rawResp.body) : rawResp.body;
-								if (parsedBody && parsedBody.usage) {
-									logger.debug(`Found usage in rawResponse.body: ${JSON.stringify(parsedBody.usage)}`);
-									responseLog.usage = mapUsageData(parsedBody.usage);
-								}
-							}
-						}
-						
-						// If still no usage, try response.headers or response.body
-						if (!responseLog.usage && responseData) {
-							logger.debug(`Checking responseData properties: ${JSON.stringify(Object.getOwnPropertyNames(responseData))}`);
-						}
-					} catch (e) {
-						logger.error(`Error accessing response object: ${e}`);
+				// Extract usage data with fallback estimation
+				// The AI SDK's usage properties exist but aren't populated for openai-compatible provider
+				// Use content-based estimation as fallback
+				const estimatedInputTokens = await estimateMessagesTokens(request);
+				const estimatedOutputTokens = Math.ceil(totalContentLength / 4);
+				
+				let finalUsage: { inputTokens: number | undefined; outputTokens: number | undefined; totalTokens: number | undefined } = {
+					inputTokens: estimatedInputTokens,
+					outputTokens: estimatedOutputTokens,
+					totalTokens: estimatedInputTokens + estimatedOutputTokens,
+				};
+				
+				logger.debug(`Estimated usage from content length: ${JSON.stringify(finalUsage)}`);
+				
+				// Try to get actual usage from AI SDK (though it's been empty so far)
+				try {
+					const usageData = await result.usage;
+					const mappedUsage = mapUsageData(usageData);
+					// Only use if we got actual values
+					if (mappedUsage && (mappedUsage.inputTokens !== undefined || mappedUsage.outputTokens !== undefined || mappedUsage.totalTokens !== undefined)) {
+						logger.debug(`Got usage from AI SDK: ${JSON.stringify(mappedUsage)}`);
+						finalUsage = mappedUsage;
+					} else {
+						logger.debug(`AI SDK usage empty, using estimated values`);
 					}
-					
-					// Final fallback: try result.usage
-					if (!responseLog.usage || (responseLog.usage.inputTokens === undefined && responseLog.usage.outputTokens === undefined && responseLog.usage.totalTokens === undefined)) {
-						logger.debug(`Still no valid usage, trying result.usage as last resort...`);
-						const usageData = await result.usage;
-						logger.debug(`usage received, type: ${typeof usageData}, value: ${JSON.stringify(usageData)}`);
-						responseLog.usage = mapUsageData(usageData);
-					}
+				} catch (e) {
+					logger.error(`Error getting usage from AI SDK: ${e}, using estimated values`);
 				}
+				
+				responseLog.usage = finalUsage;
 
 				// Calculate duration
 				const endTime = Date.now();
