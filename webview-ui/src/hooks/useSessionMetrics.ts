@@ -33,7 +33,7 @@ export const useSessionMetrics = (logs: LogMessage[]): { metrics: SessionMetrics
 		// First pass: find the chronologically latest log with usage data
 		for (const log of logs) {
 			const logTimestamp = extractTimestamp(log.request?.timestamp) || 0;
-			if (log.request?.usage?.prompt_tokens !== undefined && logTimestamp > latestTimestamp) {
+			if (log.request?.usage?.inputTokens !== undefined && logTimestamp > latestTimestamp) {
 				latestLog = log;
 				latestTimestamp = logTimestamp;
 			}
@@ -41,16 +41,14 @@ export const useSessionMetrics = (logs: LogMessage[]): { metrics: SessionMetrics
 
 		// Second pass: accumulate session totals
 		for (const log of logs) {
-			// Extract actual prompt_tokens from request usage data
-			if (log.request?.usage?.prompt_tokens !== undefined) {
-				const promptTokens = log.request.usage.prompt_tokens;
-				sessionInputTokens += promptTokens;
+			// Extract input tokens from request usage data (uses camelCase from estimation)
+			if (log.request?.usage?.inputTokens !== undefined) {
+				sessionInputTokens += log.request.usage.inputTokens;
 			}
 
-			// Extract actual completion_tokens from response usage data
-			if (log.response?.usage?.completion_tokens !== undefined) {
-				const completionTokens = log.response.usage.completion_tokens;
-				sessionOutputTokens += completionTokens;
+			// Extract output tokens from response usage data (uses camelCase from estimation)
+			if (log.response?.usage?.outputTokens !== undefined) {
+				sessionOutputTokens += log.response.usage.outputTokens;
 			}
 
 			// Create timeline (unchanged - just for visualization)
@@ -78,8 +76,8 @@ export const useSessionMetrics = (logs: LogMessage[]): { metrics: SessionMetrics
 		// Sort timeline by timestamp
 		timelineMessages.sort((a, b) => a.timestamp - b.timestamp);
 
-		// Get current context from the latest log
-		const currentContextTokens = latestLog?.request?.usage?.prompt_tokens || 0;
+		// Get current context from the latest log (uses camelCase from estimation)
+		const currentContextTokens = latestLog?.request?.usage?.inputTokens || 0;
 
 		const metrics: SessionMetrics = {
 			// Usage-based metrics
