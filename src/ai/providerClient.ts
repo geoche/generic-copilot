@@ -143,7 +143,9 @@ export abstract class ProviderClient {
 
 				// Add usage information after streaming completes
 				// Handle both AI SDK format and raw API format
+				logger.debug(`Awaiting usage data from result.usage...`);
 				const usageData = await result.usage;
+				logger.debug(`Usage data received, type: ${typeof usageData}, isNull: ${usageData === null}, isUndefined: ${usageData === undefined}`);
 				responseLog.usage = mapUsageData(usageData);
 
 				// Calculate duration
