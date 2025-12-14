@@ -228,12 +228,24 @@ export function LM2VercelMessage(messages: readonly LanguageModelChatRequestMess
  */
 export function mapUsageData(usageData: any): { inputTokens: number | undefined; outputTokens: number | undefined; totalTokens: number | undefined } | undefined {
 	if (!usageData) {
+		logger.debug(`mapUsageData: usageData is null/undefined`);
 		return undefined;
 	}
 	
+	// Log the structure for debugging
+	logger.debug(`mapUsageData received object with keys: ${Object.keys(usageData).join(', ')}`);
+	logger.debug(`mapUsageData raw data: ${JSON.stringify(usageData, null, 2)}`);
+	
+	// Check all possible property variations
+	const inputTokens = usageData.inputTokens ?? usageData.prompt_tokens ?? usageData.promptTokens;
+	const outputTokens = usageData.outputTokens ?? usageData.completion_tokens ?? usageData.completionTokens;
+	const totalTokens = usageData.totalTokens ?? usageData.total_tokens;
+	
+	logger.debug(`mapUsageData extracted: inputTokens=${inputTokens}, outputTokens=${outputTokens}, totalTokens=${totalTokens}`);
+	
 	return {
-		inputTokens: usageData.inputTokens ?? usageData.prompt_tokens,
-		outputTokens: usageData.outputTokens ?? usageData.completion_tokens,
-		totalTokens: usageData.totalTokens ?? usageData.total_tokens,
+		inputTokens,
+		outputTokens,
+		totalTokens,
 	};
 }
