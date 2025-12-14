@@ -150,19 +150,44 @@ export abstract class ProviderClient {
 				// Allow subclasses to process response-level metadata (e.g., OpenAI's responseId)
 				this.processResponseMetadata(result);
 
-				// Fallback: if usage wasn't set from finish event or has no values, try awaiting result.totalUsage and result.usage
+				// Fallback: if usage wasn't set from finish event or has no values, try accessing raw response
 				if (!responseLog.usage || (responseLog.usage.inputTokens === undefined && responseLog.usage.outputTokens === undefined && responseLog.usage.totalTokens === undefined)) {
-					logger.debug(`No valid usage from finish event, trying result.totalUsage...`);
-					// Try totalUsage first (sum of all steps)
-					const totalUsageData = await (result as any).totalUsage;
-					logger.debug(`totalUsage received, type: ${typeof totalUsageData}, value: ${JSON.stringify(totalUsageData)}`);
+					logger.debug(`No valid usage from finish event, trying to access response object...`);
 					
-					if (totalUsageData && (totalUsageData.inputTokens !== undefined || totalUsageData.outputTokens !== undefined || totalUsageData.totalTokens !== undefined)) {
-						responseLog.usage = mapUsageData(totalUsageData);
-						logger.debug(`Using totalUsage: ${JSON.stringify(responseLog.usage)}`);
-					} else {
-						// Fallback to usage (single step)
-						logger.debug(`No valid totalUsage, trying result.usage...`);
+					// Try to access the response object which may have raw data
+					try {
+						const responseData = await (result as any).response;
+						logger.debug(`response object type: ${typeof responseData}`);
+						logger.debug(`response object keys: ${responseData ? Object.keys(responseData).join(', ') : 'null'}`);
+						
+						// Check if response has rawResponse with usage
+						if (responseData && (responseData as any).rawResponse) {
+							logger.debug(`rawResponse exists, type: ${typeof (responseData as any).rawResponse}`);
+							logger.debug(`rawResponse: ${JSON.stringify((responseData as any).rawResponse)}`);
+							
+							// Try to extract usage from rawResponse
+							const rawResp = (responseData as any).rawResponse;
+							if (rawResp && rawResp.body) {
+								logger.debug(`rawResponse.body: ${JSON.stringify(rawResp.body)}`);
+								const parsedBody = typeof rawResp.body === 'string' ? JSON.parse(rawResp.body) : rawResp.body;
+								if (parsedBody && parsedBody.usage) {
+									logger.debug(`Found usage in rawResponse.body: ${JSON.stringify(parsedBody.usage)}`);
+									responseLog.usage = mapUsageData(parsedBody.usage);
+								}
+							}
+						}
+						
+						// If still no usage, try response.headers or response.body
+						if (!responseLog.usage && responseData) {
+							logger.debug(`Checking responseData properties: ${JSON.stringify(Object.getOwnPropertyNames(responseData))}`);
+						}
+					} catch (e) {
+						logger.error(`Error accessing response object: ${e}`);
+					}
+					
+					// Final fallback: try result.usage
+					if (!responseLog.usage || (responseLog.usage.inputTokens === undefined && responseLog.usage.outputTokens === undefined && responseLog.usage.totalTokens === undefined)) {
+						logger.debug(`Still no valid usage, trying result.usage as last resort...`);
 						const usageData = await result.usage;
 						logger.debug(`usage received, type: ${typeof usageData}, value: ${JSON.stringify(usageData)}`);
 						responseLog.usage = mapUsageData(usageData);
