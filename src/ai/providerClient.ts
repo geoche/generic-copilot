@@ -135,7 +135,12 @@ export abstract class ProviderClient {
 					} else if (part.type === "finish") {
 						// Extract usage data from the finish event
 						logger.debug(`Finish event received with totalUsage`);
-						responseLog.usage = mapUsageData((part as any).totalUsage);
+						const finishUsage = mapUsageData((part as any).totalUsage);
+						// Only use finish event usage if it has actual values
+						if (finishUsage && (finishUsage.inputTokens !== undefined || finishUsage.outputTokens !== undefined || finishUsage.totalTokens !== undefined)) {
+							responseLog.usage = finishUsage;
+							logger.debug(`Usage set from finish event: ${JSON.stringify(finishUsage)}`);
+						}
 					}
 				}
 				if (streamError) {
@@ -145,9 +150,9 @@ export abstract class ProviderClient {
 				// Allow subclasses to process response-level metadata (e.g., OpenAI's responseId)
 				this.processResponseMetadata(result);
 
-				// Fallback: if usage wasn't set from finish event, try awaiting result.usage
-				if (!responseLog.usage) {
-					logger.debug(`No usage from finish event, awaiting result.usage...`);
+				// Fallback: if usage wasn't set from finish event or has no values, try awaiting result.usage
+				if (!responseLog.usage || (responseLog.usage.inputTokens === undefined && responseLog.usage.outputTokens === undefined && responseLog.usage.totalTokens === undefined)) {
+					logger.debug(`No valid usage from finish event, awaiting result.usage...`);
 					const usageData = await result.usage;
 					logger.debug(`Usage data received, type: ${typeof usageData}, isNull: ${usageData === null}, isUndefined: ${usageData === undefined}`);
 					responseLog.usage = mapUsageData(usageData);

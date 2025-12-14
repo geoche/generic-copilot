@@ -234,7 +234,20 @@ export function mapUsageData(usageData: any): { inputTokens: number | undefined;
 	
 	// Log the structure for debugging
 	logger.debug(`mapUsageData received object with keys: ${Object.keys(usageData).join(', ')}`);
-	logger.debug(`mapUsageData raw data: ${JSON.stringify(usageData, null, 2)}`);
+	logger.debug(`mapUsageData typeof usageData.inputTokens: ${typeof usageData.inputTokens}, value: ${usageData.inputTokens}`);
+	logger.debug(`mapUsageData typeof usageData.outputTokens: ${typeof usageData.outputTokens}, value: ${usageData.outputTokens}`);
+	logger.debug(`mapUsageData typeof usageData.totalTokens: ${typeof usageData.totalTokens}, value: ${usageData.totalTokens}`);
+	
+	// Try to get own property descriptors to see if they're getters
+	try {
+		const descriptors = Object.getOwnPropertyDescriptors(usageData);
+		logger.debug(`mapUsageData property descriptors: ${JSON.stringify(Object.keys(descriptors))}`);
+		if (descriptors.inputTokens) {
+			logger.debug(`mapUsageData inputTokens descriptor: ${JSON.stringify(descriptors.inputTokens)}`);
+		}
+	} catch (e) {
+		logger.debug(`mapUsageData error getting descriptors: ${e}`);
+	}
 	
 	// Check all possible property variations
 	const inputTokens = usageData.inputTokens ?? usageData.prompt_tokens ?? usageData.promptTokens;
